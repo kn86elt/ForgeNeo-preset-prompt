@@ -1,7 +1,7 @@
 """
 forge-neo-preset-prompt
 
-Automatically loads user-defined Prompt templates (Positive/Negative) and Styles
+Automatically loads user-defined Prompt templates (Positive/Negative)
 when the UI Preset (PresetArch) is changed.
 
 Settings are saved in preset_prompts.json in the extension folder.
@@ -30,6 +30,10 @@ _RECENT_FILE   = os.path.join(_EXT_DIR, "recent_prompts.json")
 
 _clipboard: dict = {}
 _recent:    dict = {}
+
+# ── Copy button label constant ────────────────────────────────────────────────
+
+_COPY_LABEL = "↓ Copy current prompts to template"
 
 # ── Settings I/O ─────────────────────────────────────────────────────────────
 
@@ -99,8 +103,6 @@ def _make_tab():
     arch_names = [a.name for a in PresetArch]
     gs = _global_settings()
 
-    # shared.opts.forge_preset is the actual current value; ui_forge_preset.value
-    # is a lambda (value=lambda: shared.opts.forge_preset), not a plain string.
     try:
         current_preset = shared.opts.forge_preset
         if current_preset not in arch_names:
@@ -109,7 +111,7 @@ def _make_tab():
         current_preset = arch_names[0]
 
     with gr.Blocks(analytics_enabled=False) as tab:
-        gr.Markdown("## Preset Prompt\nConfigure Prompt / Style applied when switching UI Presets.")
+        gr.Markdown("## Preset Prompt\nConfigure Prompt applied when switching UI Presets.")
 
         # ── Global settings ──────────────────────────────────────────────────
         gr.Markdown("### Global Settings")
@@ -138,8 +140,7 @@ def _make_tab():
                 scale=2,
             )
         with gr.Row():
-            copy_btn = gr.Button("↓ Copy current prompts & styles to template", variant="secondary")
-        copy_status = gr.Markdown("")
+            copy_btn = gr.Button(_COPY_LABEL, variant="secondary")
 
         gr.Markdown("### txt2img")
         with gr.Row():
@@ -149,73 +150,51 @@ def _make_tab():
             t2i_p  = gr.Textbox(label="Positive Prompt", lines=3, scale=1)
             t2i_np = gr.Textbox(label="Negative Prompt", lines=3, scale=1)
 
-        gr.Markdown("### img2img")
-        with gr.Row():
-            i2i_ap  = gr.Checkbox(label="Apply Positive Prompt", value=True)
-            i2i_anp = gr.Checkbox(label="Apply Negative Prompt", value=True)
-        with gr.Row():
-            i2i_p  = gr.Textbox(label="Positive Prompt", lines=3, scale=1)
-            i2i_np = gr.Textbox(label="Negative Prompt", lines=3, scale=1)
-
-        gr.Markdown("### Styles")
-        with gr.Row():
-            apply_st    = gr.Checkbox(label="Apply Styles on preset switch")
-            refresh_btn = gr.Button("↻ Refresh Styles", scale=0)
-        with gr.Row():
-            t2i_st = gr.Dropdown(
-                label="txt2img Styles",
-                choices=list(shared.prompt_styles.styles),
-                multiselect=True,
-                scale=1,
-            )
-            i2i_st = gr.Dropdown(
-                label="img2img Styles",
-                choices=list(shared.prompt_styles.styles),
-                multiselect=True,
-                scale=1,
-            )
-
         with gr.Row():
             save_btn = gr.Button("Save Template", variant="primary")
         status = gr.Markdown("")
 
-        fields = [t2i_ap, t2i_anp, t2i_p, t2i_np,
-                  i2i_ap, i2i_anp, i2i_p, i2i_np,
-                  apply_st, t2i_st, i2i_st]
+        # fields: the 4 template inputs (no styles)
+        fields = [t2i_ap, t2i_anp, t2i_p, t2i_np]
 
         # ── Event handlers ───────────────────────────────────────────────────
 
         def _load_arch(preset):
             s = _arch(preset)
-            valid = set(shared.prompt_styles.styles)
             return [
                 s.get("t2i_apply_prompt",    True),
                 s.get("t2i_apply_neg_prompt", True),
                 s.get("t2i_prompt",          ""),
                 s.get("t2i_neg_prompt",       ""),
-                s.get("i2i_apply_prompt",    True),
-                s.get("i2i_apply_neg_prompt", True),
-                s.get("i2i_prompt",          ""),
-                s.get("i2i_neg_prompt",       ""),
-                s.get("apply_styles",         False),
-                [x for x in s.get("t2i_styles", []) if x in valid],
-                [x for x in s.get("i2i_styles", []) if x in valid],
+                gr.update(value=_COPY_LABEL),   # reset copy_btn label
             ]
 
-        def _save_arch(preset, tap, tanp, tp, tnp, iap, ianp, ip, inp, ast, ts, is_):
+        # tab.load reads shared.opts at browser-request time (more reliable than
+        # the static value= which is evaluated at server-startup time).
+        def _load_current():
+            try:
+                preset = shared.opts.forge_preset
+                if preset not in arch_names:
+                    preset = arch_names[0]
+            except Exception:
+                preset = arch_names[0]
+            s = _arch(preset)
+            return [
+                preset,
+                s.get("t2i_apply_prompt",    True),
+                s.get("t2i_apply_neg_prompt", True),
+                s.get("t2i_prompt",          ""),
+                s.get("t2i_neg_prompt",       ""),
+                gr.update(value=_COPY_LABEL),
+            ]
+
+        def _save_arch(preset, tap, tanp, tp, tnp):
             data = _read()
             data[preset] = {
                 "t2i_apply_prompt":    tap,
                 "t2i_apply_neg_prompt": tanp,
                 "t2i_prompt":          tp,
                 "t2i_neg_prompt":      tnp,
-                "i2i_apply_prompt":    iap,
-                "i2i_apply_neg_prompt": ianp,
-                "i2i_prompt":          ip,
-                "i2i_neg_prompt":      inp,
-                "apply_styles":        ast,
-                "t2i_styles":          ts,
-                "i2i_styles":          is_,
             }
             _write(data)
             return f"Saved template for `{preset}`."
@@ -227,27 +206,26 @@ def _make_tab():
             _write(data)
             return "Global settings saved."
 
-        def _refresh_styles():
-            shared.prompt_styles.reload()
-            choices = list(shared.prompt_styles.styles)
-            return gr.update(choices=choices), gr.update(choices=choices)
-
         # Copy: reads from _clipboard (maintained by _attach_handlers).
         # inputs=[] avoids any cross-Blocks component reference.
         def _do_copy():
-            valid = set(shared.prompt_styles.styles)
             return [
                 _clipboard.get("t2i_prompt", ""),
                 _clipboard.get("t2i_neg",    ""),
-                _clipboard.get("i2i_prompt", ""),
-                _clipboard.get("i2i_neg",    ""),
-                [x for x in _clipboard.get("t2i_styles", []) if x in valid],
-                [x for x in _clipboard.get("i2i_styles", []) if x in valid],
-                "Copied.",
+                gr.update(value="✓ Copied"),
             ]
 
-        arch_dd.change(fn=_load_arch, inputs=[arch_dd], outputs=fields, show_progress=False)
-        tab.load(fn=_load_arch, inputs=[arch_dd], outputs=fields, show_progress=False)
+        arch_dd.change(
+            fn=_load_arch,
+            inputs=[arch_dd],
+            outputs=fields + [copy_btn],
+            show_progress=False,
+        )
+        tab.load(
+            fn=_load_current,
+            outputs=[arch_dd] + fields + [copy_btn],
+            show_progress=False,
+        )
 
         save_btn.click(
             fn=_save_arch,
@@ -261,12 +239,11 @@ def _make_tab():
             outputs=[global_status],
             show_progress=False,
         )
-        refresh_btn.click(fn=_refresh_styles, outputs=[t2i_st, i2i_st], show_progress=False)
 
         copy_btn.click(
             fn=_do_copy,
             inputs=[],
-            outputs=[t2i_p, t2i_np, i2i_p, i2i_np, t2i_st, i2i_st, copy_status],
+            outputs=[t2i_p, t2i_np, copy_btn],
             show_progress=False,
         )
 
@@ -309,35 +286,23 @@ def _attach_handlers():
 
     t2i_prompt = _get_comp("txt2img", "prompt")
     t2i_neg    = _get_comp("txt2img", "negative_prompt")
-    t2i_styles = _get_comp("txt2img", "styles")
-    i2i_prompt = _get_comp("img2img", "prompt")
-    i2i_neg    = _get_comp("img2img", "negative_prompt")
-    i2i_styles = _get_comp("img2img", "styles")
 
     missing = [name for name, comp in [
-        ("txt2img/prompt",  t2i_prompt),
-        ("txt2img/neg",     t2i_neg),
-        ("txt2img/styles",  t2i_styles),
-        ("img2img/prompt",  i2i_prompt),
-        ("img2img/neg",     i2i_neg),
-        ("img2img/styles",  i2i_styles),
+        ("txt2img/prompt", t2i_prompt),
+        ("txt2img/neg",    t2i_neg),
     ] if comp is None]
     if missing:
         print(f"[preset-prompt] WARNING: components not found: {missing}")
         return
 
     # Keep _clipboard current so the copy button can read without Gradio inputs.
-    def _update_clipboard(t2p, t2n, i2p, i2n, t2s, i2s):
+    def _update_clipboard(t2p, t2n):
         _clipboard.update({
             "t2i_prompt": t2p or "",
             "t2i_neg":    t2n or "",
-            "i2i_prompt": i2p or "",
-            "i2i_neg":    i2n or "",
-            "t2i_styles": t2s or [],
-            "i2i_styles": i2s or [],
         })
 
-    _cb_inputs = [t2i_prompt, t2i_neg, i2i_prompt, i2i_neg, t2i_styles, i2i_styles]
+    _cb_inputs = [t2i_prompt, t2i_neg]
     for comp in _cb_inputs:
         comp.change(
             fn=_update_clipboard,
@@ -349,8 +314,8 @@ def _attach_handlers():
 
     prev_preset_state = gr.State(value=None)
 
-    prompt_inputs  = [t2i_prompt, t2i_neg, i2i_prompt, i2i_neg, t2i_styles, i2i_styles]
-    prompt_outputs = [t2i_prompt, t2i_neg, i2i_prompt, i2i_neg, t2i_styles, i2i_styles]
+    prompt_inputs  = [t2i_prompt, t2i_neg]
+    prompt_outputs = [t2i_prompt, t2i_neg]
 
     def _apply_template(preset):
         s = _arch(preset)
@@ -360,52 +325,28 @@ def _attach_handlers():
                 return gr.skip()
             return gr.update(value=s.get(value_key, ""))
 
-        if s.get("apply_styles", False):
-            valid = set(shared.prompt_styles.styles)
-            st2i = gr.update(value=[x for x in s.get("t2i_styles", []) if x in valid])
-            si2i = gr.update(value=[x for x in s.get("i2i_styles", []) if x in valid])
-        else:
-            st2i = gr.skip()
-            si2i = gr.skip()
-
         return [
             _apply("t2i_apply_prompt",    "t2i_prompt"),
             _apply("t2i_apply_neg_prompt", "t2i_neg_prompt"),
-            _apply("i2i_apply_prompt",    "i2i_prompt"),
-            _apply("i2i_apply_neg_prompt", "i2i_neg_prompt"),
-            st2i,
-            si2i,
         ]
 
     def _restore_recent(preset):
         r = _recent[preset]
-        valid = set(shared.prompt_styles.styles)
         return [
             gr.update(value=r.get("t2i_prompt",     "")),
             gr.update(value=r.get("t2i_neg_prompt", "")),
-            gr.update(value=r.get("i2i_prompt",     "")),
-            gr.update(value=r.get("i2i_neg_prompt", "")),
-            gr.update(value=[x for x in r.get("t2i_styles", []) if x in valid]),
-            gr.update(value=[x for x in r.get("i2i_styles", []) if x in valid]),
         ]
 
-    def _load(new_preset, prev_preset,
-              cur_t2i_p, cur_t2i_np, cur_i2i_p, cur_i2i_np,
-              cur_t2i_st, cur_i2i_st):
+    def _load(new_preset, prev_preset, cur_t2i_p, cur_t2i_np):
         gs = _global_settings()
 
         # Also keep clipboard current (covers page-load and preset-switch moments)
-        _update_clipboard(cur_t2i_p, cur_t2i_np, cur_i2i_p, cur_i2i_np,
-                          cur_t2i_st, cur_i2i_st)
+        _update_clipboard(cur_t2i_p, cur_t2i_np)
 
         if gs["auto_save"] and prev_preset is not None:
             snapshot = {
                 "t2i_prompt":     cur_t2i_p,
                 "t2i_neg_prompt": cur_t2i_np,
-                "i2i_prompt":     cur_i2i_p,
-                "i2i_neg_prompt": cur_i2i_np,
-                "t2i_styles":     cur_t2i_st or [],
-                "i2i_styles":     cur_i2i_st or [],
             }
             _recent[prev_preset] = snapshot
             if gs["persist_recent"]:
