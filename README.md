@@ -1,134 +1,121 @@
-# forge-neo-preset-prompt
+# ForgeNeo-preset-prompt
 
-Stable Diffusion WebUI Forge Neo 向け拡張機能。  
-**UI Preset（モデルアーキテクチャ）を切り替えた際に、対応する Prompt テンプレートと Style を自動的にロードします。**
+A [Stable Diffusion WebUI Forge Neo](https://github.com/lllyasviel/stable-diffusion-webui-forge) extension that automatically loads user-defined prompt templates when the **UI Preset** (model architecture) is switched.
 
----
-
-## 機能
-
-- UI Preset ドロップダウン（SD / XL / Flux / Wan …）の切り替えに連動
-- txt2img・img2img それぞれに独立した Positive / Negative Prompt テンプレートを設定可能
-- Style（`styles.csv` に登録済みのスタイル名）の自動選択に対応
-- フィールドごとにチェックボックスで適用/スキップを個別制御
-- 設定は拡張フォルダ内の `preset_prompts.json` に保存（本体の `config.json` は無変更）
-
-## 動作フロー
-
-```
-UI Preset ドロップダウンを変更
-  │
-  ├─ [既存の Forge Neo 処理]
-  │    sampler / scheduler / steps / CFG / width / height を更新
-  │
-  └─ [この拡張の処理]
-       ├─ Apply Positive Prompt が ON → txt2img / img2img の Positive Prompt を上書き
-       ├─ Apply Negative Prompt が ON → txt2img / img2img の Negative Prompt を上書き
-       └─ Apply Styles が ON        → txt2img / img2img の Style ドロップダウンを更新
-```
-
-チェックオフのフィールドは **現在の値を保持**します。  
-チェックオンかつテキストが空欄の場合は **空欄に上書き**します（Negative Prompt クリアに活用できます）。
+[日本語版 README はこちら](README-ja.md)
 
 ---
 
-## インストール
+## Features
 
-拡張フォルダへのコピー（シンボリックリンク or 直接コピー）:
-
-```
-ForgeNeo/extensions/forge-neo-preset-prompt/
-    scripts/
-        preset_prompt.py   ← このリポジトリの scripts/preset_prompt.py
-    preset_prompts.json    ← 初回 Save 時に自動生成
-```
-
-Forge Neo を再起動すると有効になります。
-
-### シンボリックリンクでの運用（推奨）
-
-```bat
-mklink /D "C:\usr\sd\ForgeNeo\extensions\forge-neo-preset-prompt" "C:\usr\sd\forge-neo-preset"
-```
+- Triggered by the **UI Preset** dropdown (SD / XL / Flux / Wan …)
+- Per-preset **Positive** and **Negative** prompt templates for txt2img
+- Per-field **Apply** checkboxes — uncheck to keep the current value unchanged
+- **Copy prompts from txt2img** — one-click snapshot of the current prompts into the template editor
+- **Auto-save & restore** — pushes current prompts when leaving a preset and restores them on return; falls back to the saved template if no snapshot exists
+- **Persist recent prompts** — optionally writes the auto-save buffer to disk so it survives restarts
+- **Enable / disable** toggle — temporarily suspend template loading without losing your configuration
+- Settings are stored in `preset_prompts.json` inside the extension folder; `config.json` is never touched
 
 ---
 
-## 設定方法
+## Installation
 
-1. Forge Neo を起動し、上部タブから **"Preset Prompt"** を選択
-2. 編集したい **UI Preset**（sd / xl / flux …）をドロップダウンで選択  
-   → 選択と同時に保存済みの値がロードされます
-3. 各フィールドを設定:
+### Method 1 — Extensions tab (recommended)
 
-   | セクション | 項目 | 説明 |
-   |---|---|---|
-   | txt2img | Apply Positive Prompt | チェックオンで Positive Prompt を適用 |
-   | txt2img | Apply Negative Prompt | チェックオンで Negative Prompt を適用 |
-   | txt2img | Positive / Negative Prompt | テンプレートテキスト |
-   | img2img | 同上 | img2img タブ用（txt2img とは独立） |
-   | Styles | Apply Styles | チェックオンで Style ドロップダウンを更新 |
-   | Styles | txt2img / img2img Styles | 適用するスタイル名（複数選択可） |
+1. Open Forge Neo WebUI
+2. Go to **Extensions** → **Install from URL**
+3. Enter the URL and click **Install**:
+   ```
+   https://github.com/kn86elt/ForgeNeo-preset-prompt
+   ```
+4. Go to the **Installed** tab and click **Apply and restart UI**
 
-4. **"Save"** ボタンで保存  
-5. UI Preset を切り替えるたびに自動適用されます
+### Method 2 — Manual placement
 
-> **Refresh Styles ボタン**: `styles.csv` を再読み込みしてドロップダウンの選択肢を更新します。
+Clone (or download and unzip) the repository into the `extensions/` folder of your Forge Neo installation:
+
+```
+<ForgeNeo root>/
+└── extensions/
+    └── ForgeNeo-preset-prompt/
+        └── scripts/
+            └── preset_prompt.py
+```
+
+Then restart Forge Neo.
 
 ---
 
-## 設定ファイル
+## Usage
 
-設定は拡張フォルダ直下の `preset_prompts.json` に保存されます。  
-本体の `config.json` / `ui-config.json` は変更しません。
+### Basic workflow
+
+1. Open Forge Neo — the **Preset Prompt** tab appears in the top navigation bar
+2. Select the **UI Preset** you want to configure
+3. Fill in the **Positive Prompt** and/or **Negative Prompt** template fields
+4. Use the **Apply** checkboxes to control which fields are overwritten on preset switch  
+   (unchecked = that field is left as-is when switching)
+5. Click **Save Template**
+6. Switch UI Presets — the template loads automatically
+
+### Copy prompts from txt2img
+
+Click **↓ Copy prompts from txt2img** to copy the current txt2img prompts into the template editor for the selected preset. Adjust if needed, then save.
+
+### Apply template on preset switch
+
+The checkbox below the preset selector enables or disables template loading. Uncheck to temporarily stop overwriting prompts when switching presets. The setting is saved automatically and persists across restarts.
+
+### Global Settings
+
+Click the **⚙ Global Settings** accordion to expand:
+
+| Setting | Description |
+|---|---|
+| Auto-save & restore prompts on preset switch | Saves current prompts when leaving a preset and restores them when returning. Falls back to the saved template when no snapshot exists. |
+| Persist recent prompts across restarts | Writes the auto-save buffer to `recent_prompts.json` so it survives Forge Neo restarts. |
+
+---
+
+## Settings files
+
+| File | Contents |
+|---|---|
+| `preset_prompts.json` | Templates and global settings |
+| `recent_prompts.json` | Auto-save buffer (only when Persist is enabled) |
+
+Both files are stored inside the extension folder. `config.json` and `ui-config.json` are never modified.
+
+Example `preset_prompts.json`:
 
 ```json
 {
+  "auto_save": false,
+  "persist_recent": false,
+  "enable": true,
   "sd": {
     "t2i_apply_prompt": true,
-    "t2i_prompt": "masterpiece, best quality",
     "t2i_apply_neg_prompt": true,
-    "t2i_neg_prompt": "worst quality, low quality",
-    "i2i_apply_prompt": false,
-    "i2i_prompt": "",
-    "i2i_apply_neg_prompt": false,
-    "i2i_neg_prompt": "",
-    "apply_styles": false,
-    "t2i_styles": [],
-    "i2i_styles": []
+    "t2i_prompt": "masterpiece, best quality",
+    "t2i_neg_prompt": "worst quality, low quality"
   },
   "flux": {
     "t2i_apply_prompt": false,
-    "t2i_prompt": "",
     "t2i_apply_neg_prompt": true,
-    "t2i_neg_prompt": "",
-    "i2i_apply_prompt": false,
-    "i2i_prompt": "",
-    "i2i_apply_neg_prompt": false,
-    "i2i_neg_prompt": "",
-    "apply_styles": true,
-    "t2i_styles": ["My Flux Style"],
-    "i2i_styles": []
+    "t2i_prompt": "",
+    "t2i_neg_prompt": ""
   }
 }
 ```
 
 ---
 
-## 互換性
+## Supported architectures
 
-| 状況 | 動作 |
-|---|---|
-| 拡張未導入 | `preset_prompts.json` が存在しないだけ。Forge Neo 本体に影響なし |
-| 拡張を削除 | `preset_prompts.json` がフォルダごと残るが `config.json` は無傷 |
-| Forge Neo 本体の更新 | `forge_main_entry()` のシグネチャが変わった場合のみ要修正 |
+All architectures defined in `PresetArch`:
 
----
-
-## 対応アーキテクチャ
-
-`PresetArch` に定義されているすべてのアーキテクチャに対応します:
-
-| キー | モデル |
+| Key | Model |
 |---|---|
 | `sd` | Stable Diffusion 1.x |
 | `xl` | SDXL |
@@ -143,8 +130,10 @@ mklink /D "C:\usr\sd\ForgeNeo\extensions\forge-neo-preset-prompt" "C:\usr\sd\for
 
 ---
 
-## 技術メモ
+## Compatibility
 
-- `modules_forge.main_entry.forge_main_entry` をモンキーパッチして、プリセット変更イベントハンドラを Gradio の `gr.Blocks` コンテキスト内に追加登録
-- プロンプトコンポーネントは `infotext_utils.paste_fields` の `api` 属性（`"prompt"` / `"negative_prompt"` / `"styles"`）で取得
-- ページ初回ロード時も `Context.root_block.load()` により現在のプリセット値を適用
+| Situation | Behavior |
+|---|---|
+| Extension not installed | No effect on Forge Neo — `preset_prompts.json` simply does not exist |
+| Extension removed | JSON files remain in the old folder but `config.json` is untouched |
+| Forge Neo update | Only affected if `forge_main_entry()` signature changes |
