@@ -34,7 +34,7 @@ _recent:    dict = {}
 # ── Copy indicator HTML ───────────────────────────────────────────────────────
 
 _IND_EMPTY  = '<div style="height:1.4em"> </div>'
-_IND_COPIED = '<div style="height:1.4em;color:#4caf50;font-size:0.9em">✓ Copied to template</div>'
+_IND_COPIED = '<div style="height:1.4em;color:#4caf50;font-size:0.9em">✓ Copied from txt2img</div>'
 
 # ── Settings I/O ─────────────────────────────────────────────────────────────
 
@@ -63,6 +63,7 @@ def _global_settings() -> dict:
     return {
         "auto_save":      data.get("auto_save",      False),
         "persist_recent": data.get("persist_recent", False),
+        "enable":         data.get("enable",         True),
     }
 
 
@@ -94,6 +95,8 @@ def _init_recent():
 
 
 _init_recent()
+
+_enabled: bool = _global_settings()["enable"]
 
 
 # ── 1. Settings tab ──────────────────────────────────────────────────────────
@@ -141,9 +144,14 @@ def _make_tab():
                 scale=3,
             )
             copy_btn = gr.Button(
-                "↓ Copy prompts to template",
+                "↓ Copy prompts from txt2img",
                 variant="secondary",
                 scale=2,
+            )
+        with gr.Row():
+            enable_cb = gr.Checkbox(
+                label="Apply template on preset switch",
+                value=gs["enable"],
             )
         copy_indicator = gr.HTML(_IND_EMPTY)
 
@@ -176,6 +184,9 @@ def _make_tab():
         # tab.load reads shared.opts at browser-request time (more reliable than
         # the static value= which is evaluated at server-startup time).
         def _load_current():
+            global _enabled
+            gs2 = _global_settings()
+            _enabled = gs2["enable"]
             try:
                 preset = shared.opts.forge_preset
                 if preset not in arch_names:
@@ -190,7 +201,15 @@ def _make_tab():
                 s.get("t2i_prompt",          ""),
                 s.get("t2i_neg_prompt",       ""),
                 _IND_EMPTY,
+                gs2["enable"],
             ]
+
+        def _toggle_enable(v):
+            global _enabled
+            _enabled = v
+            data = _read()
+            data["enable"] = v
+            _write(data)
 
         def _save_arch(preset, tap, tanp, tp, tnp):
             data = _read()
@@ -227,7 +246,13 @@ def _make_tab():
         )
         tab.load(
             fn=_load_current,
-            outputs=[arch_dd] + fields + [copy_indicator],
+            outputs=[arch_dd] + fields + [copy_indicator, enable_cb],
+            show_progress=False,
+        )
+        enable_cb.change(
+            fn=_toggle_enable,
+            inputs=[enable_cb],
+            outputs=[],
             show_progress=False,
         )
 
@@ -346,6 +371,9 @@ def _attach_handlers():
 
         # Also keep clipboard current (covers page-load and preset-switch moments)
         _update_clipboard(cur_t2i_p, cur_t2i_np)
+
+        if not _enabled:
+            return [gr.skip(), gr.skip(), new_preset]
 
         if gs["auto_save"] and prev_preset is not None:
             snapshot = {
