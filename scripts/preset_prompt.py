@@ -24,16 +24,17 @@ _SETTINGS_FILE = os.path.join(_EXT_DIR, "preset_prompts.json")
 _RECENT_FILE   = os.path.join(_EXT_DIR, "recent_prompts.json")
 
 # ── Session state ─────────────────────────────────────────────────────────────
-# _clipboard: kept current by .change() hooks registered in _attach_handlers().
+# _clipboard: kept current by .change() hooks in _attach_handlers().
 #             copy button reads from here with inputs=[] (no cross-Blocks refs).
 # _recent:    per-arch snapshot for auto-save/restore.
 
 _clipboard: dict = {}
 _recent:    dict = {}
 
-# ── Copy button label constant ────────────────────────────────────────────────
+# ── Copy indicator HTML ───────────────────────────────────────────────────────
 
-_COPY_LABEL = "↓ Copy current prompts to template"
+_IND_EMPTY  = '<div style="height:1.4em"> </div>'
+_IND_COPIED = '<div style="height:1.4em;color:#4caf50;font-size:0.9em">✓ Copied to template</div>'
 
 # ── Settings I/O ─────────────────────────────────────────────────────────────
 
@@ -113,36 +114,40 @@ def _make_tab():
     with gr.Blocks(analytics_enabled=False) as tab:
         gr.Markdown("## Preset Prompt\nConfigure Prompt applied when switching UI Presets.")
 
-        # ── Global settings ──────────────────────────────────────────────────
-        gr.Markdown("### Global Settings")
-        with gr.Row():
-            auto_save_cb = gr.Checkbox(
-                label="Auto-save & restore prompts on preset switch",
-                value=gs["auto_save"],
-            )
-            persist_cb = gr.Checkbox(
-                label="Persist recent prompts across restarts",
-                value=gs["persist_recent"],
-            )
-        with gr.Row():
-            save_global_btn = gr.Button("Save Global Settings", variant="secondary", scale=0)
-        global_status = gr.Markdown("")
+        # ── Global settings (collapsed by default to save space) ─────────────
+        with gr.Accordion("⚙ Global Settings", open=False):
+            with gr.Row():
+                auto_save_cb = gr.Checkbox(
+                    label="Auto-save & restore prompts on preset switch",
+                    value=gs["auto_save"],
+                    scale=2,
+                )
+                persist_cb = gr.Checkbox(
+                    label="Persist recent prompts across restarts",
+                    value=gs["persist_recent"],
+                    scale=2,
+                )
+                save_global_btn = gr.Button("Save Settings", variant="secondary", scale=1)
+            global_status = gr.Markdown("")
 
         gr.Markdown("---")
 
-        # ── Per-preset templates ─────────────────────────────────────────────
-        gr.Markdown("### Per-Preset Templates")
+        # ── Preset selector + copy button (same row) ─────────────────────────
         with gr.Row():
             arch_dd = gr.Dropdown(
                 label="UI Preset",
                 choices=arch_names,
                 value=current_preset,
+                scale=3,
+            )
+            copy_btn = gr.Button(
+                "↓ Copy prompts to template",
+                variant="secondary",
                 scale=2,
             )
-        with gr.Row():
-            copy_btn = gr.Button(_COPY_LABEL, variant="secondary")
+        copy_indicator = gr.HTML(_IND_EMPTY)
 
-        gr.Markdown("### txt2img")
+        # ── txt2img prompt template ──────────────────────────────────────────
         with gr.Row():
             t2i_ap  = gr.Checkbox(label="Apply Positive Prompt", value=True)
             t2i_anp = gr.Checkbox(label="Apply Negative Prompt", value=True)
@@ -151,10 +156,9 @@ def _make_tab():
             t2i_np = gr.Textbox(label="Negative Prompt", lines=3, scale=1)
 
         with gr.Row():
-            save_btn = gr.Button("Save Template", variant="primary")
-        status = gr.Markdown("")
+            save_btn = gr.Button("Save Template", variant="primary", scale=0)
+            status   = gr.Markdown("", scale=1)
 
-        # fields: the 4 template inputs (no styles)
         fields = [t2i_ap, t2i_anp, t2i_p, t2i_np]
 
         # ── Event handlers ───────────────────────────────────────────────────
@@ -166,7 +170,7 @@ def _make_tab():
                 s.get("t2i_apply_neg_prompt", True),
                 s.get("t2i_prompt",          ""),
                 s.get("t2i_neg_prompt",       ""),
-                gr.update(value=_COPY_LABEL),   # reset copy_btn label
+                _IND_EMPTY,
             ]
 
         # tab.load reads shared.opts at browser-request time (more reliable than
@@ -185,7 +189,7 @@ def _make_tab():
                 s.get("t2i_apply_neg_prompt", True),
                 s.get("t2i_prompt",          ""),
                 s.get("t2i_neg_prompt",       ""),
-                gr.update(value=_COPY_LABEL),
+                _IND_EMPTY,
             ]
 
         def _save_arch(preset, tap, tanp, tp, tnp):
@@ -212,18 +216,18 @@ def _make_tab():
             return [
                 _clipboard.get("t2i_prompt", ""),
                 _clipboard.get("t2i_neg",    ""),
-                gr.update(value="✓ Copied"),
+                _IND_COPIED,
             ]
 
         arch_dd.change(
             fn=_load_arch,
             inputs=[arch_dd],
-            outputs=fields + [copy_btn],
+            outputs=fields + [copy_indicator],
             show_progress=False,
         )
         tab.load(
             fn=_load_current,
-            outputs=[arch_dd] + fields + [copy_btn],
+            outputs=[arch_dd] + fields + [copy_indicator],
             show_progress=False,
         )
 
@@ -243,7 +247,7 @@ def _make_tab():
         copy_btn.click(
             fn=_do_copy,
             inputs=[],
-            outputs=[t2i_p, t2i_np, copy_btn],
+            outputs=[t2i_p, t2i_np, copy_indicator],
             show_progress=False,
         )
 
