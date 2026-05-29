@@ -128,10 +128,12 @@
 
 ---
 
-## 互換性
+## 2026/05/29 v0.0.2 修正内容
 
-| 状況 | 動作 |
-|---|---|
-| 拡張未導入 | Forge Neo 本体に影響なし。`preset_prompts.json` が存在しないだけ |
-| 拡張を削除 | JSON ファイルは残るが `config.json` は無傷 |
-| Forge Neo 本体の更新 | `forge_main_entry()` のシグネチャが変わった場合のみ要修正 |
+- プリセット切り替え時に、以前のVAE/Text Encoder選択が残る場合がある問題を修正しました。
+  Anima/Qwen系プリセットから、VAE/TE無指定のXLへ戻した際に、互換性のない追加モジュールが `forge_additional_modules` に残る可能性がありました。
+- 起動時に、現在選択中のプリセットに対応するCheckpoint / VAE・Text Encoder / dtype設定をForgeNeoのモデル読み込み前に同期するようにしました。
+
+## ライセンス
+
+[MIT](LICENSE)

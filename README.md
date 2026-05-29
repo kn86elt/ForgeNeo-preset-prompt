@@ -129,11 +129,12 @@ All architectures defined in `PresetArch`:
 | `ernie` | Ernie-Image |
 
 ---
+## 2026-05-29 v0.0.2 Fixes
 
-## Compatibility
+- Fixed an issue where switching presets could leave stale VAE/Text Encoder selections active.
+  This could happen when switching from Anima/Qwen-style presets back to XL with no VAE/TE selected, causing incompatible modules to remain in `forge_additional_modules`.
+- On startup, the extension now synchronizes the active preset's checkpoint, VAE/TE, and dtype settings before ForgeNeo prepares model loading parameters.
+---
+## License
 
-| Situation | Behavior |
-|---|---|
-| Extension not installed | No effect on Forge Neo — `preset_prompts.json` simply does not exist |
-| Extension removed | JSON files remain in the old folder but `config.json` is untouched |
-| Forge Neo update | Only affected if `forge_main_entry()` signature changes |
+[MIT](LICENSE)

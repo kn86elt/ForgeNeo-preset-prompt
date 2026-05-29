@@ -291,9 +291,64 @@ script_callbacks.on_ui_tabs(
 import modules_forge.main_entry as _me  # noqa: E402
 
 _orig_forge_main_entry = _me.forge_main_entry
+_orig_load_presets = _me._load_presets
+
+
+def _sync_active_preset_model_settings():
+    preset = getattr(shared.opts, "forge_preset", None)
+    if not preset:
+        return
+
+    changed = False
+
+    checkpoint = getattr(shared.opts, f"forge_checkpoint_{preset}", None)
+    if checkpoint is not None and checkpoint != getattr(shared.opts, "sd_model_checkpoint", None):
+        shared.opts.set("sd_model_checkpoint", checkpoint)
+        changed = True
+
+    modules = getattr(shared.opts, f"forge_additional_modules_{preset}", None)
+    if modules is not None and modules != getattr(shared.opts, "forge_additional_modules", None):
+        shared.opts.set("forge_additional_modules", modules)
+        changed = True
+
+    dtype = getattr(shared.opts, f"forge_unet_storage_dtype_{preset}", None)
+    if dtype is not None and dtype != getattr(shared.opts, "forge_unet_storage_dtype", None):
+        shared.opts.set("forge_unet_storage_dtype", dtype)
+        changed = True
+
+    if changed:
+        shared.opts.save(shared.config_filename)
+
+
+def _patched_load_presets(ui_checkpoint: str, ui_vae: list[str], ui_forge_unet_dtype: str, ui_forge_preset: str):
+    preset = ui_forge_preset
+    if preset is None:
+        return _orig_load_presets(ui_checkpoint, ui_vae, ui_forge_unet_dtype, ui_forge_preset)
+
+    # Read the per-preset model settings directly.  When VAE/TE is switched to
+    # "no selection", the UI event can otherwise hand the old multiselect value
+    # to Forge's loader and leave incompatible modules active.
+    checkpoint = getattr(shared.opts, f"forge_checkpoint_{preset}", ui_checkpoint)
+    modules = getattr(shared.opts, f"forge_additional_modules_{preset}", ui_vae)
+    dtype = getattr(shared.opts, f"forge_unet_storage_dtype_{preset}", ui_forge_unet_dtype)
+
+    dtype_changed = dtype != getattr(shared.opts, "forge_unet_storage_dtype", None)
+    if dtype_changed:
+        _me.dtype_change(dtype, preset, save=False, refresh=False)
+
+    modules_changed = _me.modules_change(modules, preset, save=False, refresh=False)
+    checkpoint_changed = _me.checkpoint_change(checkpoint, preset, save=False, refresh=False)
+
+    if dtype_changed or modules_changed or checkpoint_changed:
+        shared.opts.save(shared.config_filename)
+        _me.refresh_model_loading_parameters(refresh=True)
+
+
+_me._load_presets = _patched_load_presets
 
 
 def _patched_forge_main_entry():
+    _sync_active_preset_model_settings()
     _orig_forge_main_entry()
     _attach_handlers()
 
