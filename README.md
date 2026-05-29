@@ -130,10 +130,6 @@ All architectures defined in `PresetArch`:
 
 ---
 
-## Compatibility
+## License
 
-| Situation | Behavior |
-|---|---|
-| Extension not installed | No effect on Forge Neo — `preset_prompts.json` simply does not exist |
-| Extension removed | JSON files remain in the old folder but `config.json` is untouched |
-| Forge Neo update | Only affected if `forge_main_entry()` signature changes |
+[MIT](LICENSE)

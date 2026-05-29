@@ -128,10 +128,6 @@
 
 ---
 
-## 互換性
+## ライセンス
 
-| 状況 | 動作 |
-|---|---|
-| 拡張未導入 | Forge Neo 本体に影響なし。`preset_prompts.json` が存在しないだけ |
-| 拡張を削除 | JSON ファイルは残るが `config.json` は無傷 |
-| Forge Neo 本体の更新 | `forge_main_entry()` のシグネチャが変わった場合のみ要修正 |
+[MIT](LICENSE)
